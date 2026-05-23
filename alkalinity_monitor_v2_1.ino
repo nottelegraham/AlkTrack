@@ -90,6 +90,12 @@
 
 #define SIMULATION_MODE true
 
+// ESP32 web server: included when built via PlatformIO with WEB_ENABLED
+// For emulator builds, WebServer.h is included from emulator/main.cpp instead.
+#if defined(WEB_ENABLED) && defined(ARDUINO) && defined(ESP32) && !SIMULATION_MODE
+#include "WebServer_ESP32.h"
+#endif
+
 // ── Pins ────────────────────────────────────────────────────
 const int PUMP_REF_FWD  = 23;
 const int PUMP_REF_REV  = 19;
@@ -199,6 +205,10 @@ float            read_Temp_C();
 void setup() {
   Serial.begin(115200);
 
+#if defined(WEB_ENABLED) && defined(ARDUINO) && defined(ESP32) && !SIMULATION_MODE
+  webServer_begin();
+#endif
+
   const int outPins[] = {PUMP_REF_FWD, PUMP_REF_REV, PUMP_TANK,
                          PUMP_WASTE, AIR_PUMP, DAC_TREND_OUT};
   for (int p : outPins) { pinMode(p, OUTPUT); }
@@ -220,6 +230,9 @@ void setup() {
     Serial.println("No valid anchor. Send: CAL 8.20");
     while (!calibrationIsValid()) {
       handleSerialCommands();
+#if defined(WEB_ENABLED)
+      webServer_poll();
+#endif
       delay(100);
     }
   }
@@ -258,6 +271,20 @@ void loop() {
   Serial.print("Temp ref: "); Serial.print(ref.tempC, 2);
   Serial.print("  Temp tank: "); Serial.println(tank.tempC, 2);
 
+#if defined(WEB_ENABLED)
+  g_webState.lastResult_dKH = result_dKH;
+  g_webState.lastRefPH = ref.pH;
+  g_webState.lastTankPH = tank.pH;
+  g_webState.lastRefSD = ref.pHStdDev;
+  g_webState.lastTankSD = tank.pHStdDev;
+  g_webState.lastTemp = tank.tempC;
+  g_webState.anchor_dKH = cal.referenceAlk_dKH;
+  int idx = g_webState.historyCount % 24;
+  g_webState.history[idx] = result_dKH;
+  g_webState.historyCount++;
+  g_webState.cyclePhase = "idle";
+#endif
+
   updateTrendOutput(result_dKH);
   sleepUntilNextCycle();
 }
@@ -267,8 +294,14 @@ void loop() {
 // ============================================================
 
 SampleReading runReferenceCycle() {
+#if defined(WEB_ENABLED)
+  g_webState.cyclePhase = "ref_fill";
+#endif
   Serial.println("[REF] Filling...");
   runPumpBlocking(PUMP_REF_FWD, FILL_TIME_MS);
+#if defined(WEB_ENABLED)
+  g_webState.cyclePhase = "ref_aerate";
+#endif
   runAeration(AERATE_TIME_MS);
   if (g_abortCycle) {
     // Always return reference water before aborting.
@@ -301,8 +334,14 @@ void runFlushCycle(bool doubleRinse) {
 }
 
 SampleReading runTankCycle() {
+#if defined(WEB_ENABLED)
+  g_webState.cyclePhase = "tank_fill";
+#endif
   Serial.println("[TANK] Filling...");
   runPumpBlocking(PUMP_TANK, FILL_TIME_MS);
+#if defined(WEB_ENABLED)
+  g_webState.cyclePhase = "tank_aerate";
+#endif
   runAeration(AERATE_TIME_MS);
   if (g_abortCycle) { runPumpBlocking(PUMP_WASTE, DRAIN_TIME_MS); return {0, 0, 0, false}; }
   runSettleDelay(SETTLE_TIME_MS);
@@ -320,6 +359,9 @@ void runAeration(unsigned long ms) {
   unsigned long t0 = millis(), lastPrint = 0;
   while (millis() - t0 < ms) {
     handleSerialCommands();
+#if defined(WEB_ENABLED)
+    webServer_poll();
+#endif
     if (g_abortCycle) { digitalWrite(AIR_PUMP, LOW); return; }
     unsigned long elapsed = millis() - t0;
     if (elapsed >= lastPrint + 60000UL) {
@@ -337,6 +379,9 @@ void runSettleDelay(unsigned long ms) {
   unsigned long t0 = millis();
   while (millis() - t0 < ms) {
     handleSerialCommands();
+#if defined(WEB_ENABLED)
+    webServer_poll();
+#endif
     if (g_abortCycle) return;
     delay(100);
   }
@@ -345,19 +390,31 @@ void runSettleDelay(unsigned long ms) {
 // Short blocking pump run. Keep each call under ~20 s (watchdog safe on ESP32).
 void runPumpBlocking(int pin, unsigned long ms) {
   digitalWrite(pin, HIGH);
-  delay(ms);
+  unsigned long t0 = millis();
+  while (millis() - t0 < ms) {
+#if defined(WEB_ENABLED)
+    webServer_poll();
+#endif
+    delay(50);
+  }
   digitalWrite(pin, LOW);
   delay(250);
 }
 
 // Non-blocking inter-cycle sleep.
 void sleepUntilNextCycle() {
+#if defined(WEB_ENABLED)
+  g_webState.cyclePhase = "sleeping";
+#endif
   Serial.print("Next cycle in ");
   Serial.print(TEST_INTERVAL_MS / 3600000.0f, 1);
   Serial.println(" h.  Commands: STATUS  CAL <dKH>  PUMPS_OFF  RUN  PRIME");
   unsigned long t0 = millis();
   while (millis() - t0 < TEST_INTERVAL_MS) {
     handleSerialCommands();
+#if defined(WEB_ENABLED)
+    webServer_poll();
+#endif
     if (g_forceRun) { g_forceRun = false; return; }
     delay(100);
   }
@@ -519,6 +576,9 @@ void saveCalibration(float v) {
   cal.referenceAlk_dKH = v;
   EEPROM.put(EEPROM_ADDR, cal);
   EEPROM.commit();
+#if defined(WEB_ENABLED)
+  g_webState.anchor_dKH = v;
+#endif
   Serial.print("Anchor saved: "); Serial.print(v, 2); Serial.println(" dKH");
 }
 
@@ -619,3 +679,29 @@ float read_Temp_C() {
   return (t == DEVICE_DISCONNECTED_C) ? NAN : t;
 #endif
 }
+
+// ============================================================
+//  WEB COMMAND HANDLER (ESP32 build)
+// ============================================================
+
+#if defined(WEB_ENABLED) && defined(ARDUINO) && defined(ESP32) && !SIMULATION_MODE
+void handleWebCommand(const char* cmd) {
+  String line(cmd);
+  line.trim();
+  line.toUpperCase();
+
+  if (line.startsWith("CAL ")) {
+    float v = line.substring(4).toFloat();
+    if (v >= MIN_VALID_DKH && v <= MAX_VALID_DKH) saveCalibration(v);
+  }
+  else if (line == "PUMPS_OFF") {
+    ensurePumpsOff();
+    g_abortCycle = true;
+    Serial.println("EMERGENCY STOP");
+  }
+  else if (line == "RUN") {
+    g_forceRun = true;
+    Serial.println("RUN queued.");
+  }
+}
+#endif
