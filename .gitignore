@@ -1,0 +1,4 @@
+emulator/alktrack_emu
+emulator/eeprom.bin
+.pio/
+.vscode/
