@@ -1,5 +1,5 @@
 # DIY Ratiometric Alkalinity Monitor
-**Telegraham Tested** — Firmware v2.1.2
+**TelegrahamTested** — Firmware v2.2
 
 A reagent-free automated alkalinity trend monitor for reef aquariums. Uses carbonate chemistry to track whether your dKH is rising, falling, or stable — automatically, every 4 hours, without titration or chemicals.
 
@@ -54,7 +54,7 @@ Open `alkalinity_monitor_v2_1_1/alkalinity_monitor_v2_1_1.ino` in Arduino IDE.
 | `Build_Guide.docx` | Full build instructions and shopping list |
 | `User_Guide.docx` | Step-by-step operating instructions |
 | `Price_Sheet.xlsx` | Itemised component cost spreadsheet |
-| `Changelog.docx` | Full version history v1 → v2.1.2 |
+| `Changelog.docx` | Full version history v1 → v2.2 |
 
 ## How it works
 
@@ -72,6 +72,6 @@ Equilibrium constants: K1 and K2 from Lueker et al. (2000), KB from Dickson (199
 
 ## License
 
-**CC0 1.0 Universal — No rights reserved.**  
+**CC BY-NC-SA 4.0**  
 Firmware, documentation, schematics, and all associated files are dedicated to the public domain. Copy, modify, sell, redistribute — no permission, attribution, or conditions required.  
-See [LICENSE](LICENSE) or [creativecommons.org/publicdomain/zero/1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+See [LICENSE](LICENSE) or [creativecommons.org/licenses/by-nc-sa/4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)

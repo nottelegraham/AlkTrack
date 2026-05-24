@@ -1,7 +1,7 @@
 /*
  * ============================================================
  *  DIY Ratiometric Alkalinity Trend Monitor  —  v2.2
- *  Telegraham Tested
+ *  TelegrahamTested
  * ============================================================
  *
  *  WHAT IS NEW IN v2.2:
@@ -93,15 +93,15 @@
  *
  * ============================================================
  */
-// SPDX-License-Identifier: CC0-1.0
-// No rights reserved. Telegraham Tested, 2025.
-// https://creativecommons.org/publicdomain/zero/1.0/
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// TelegrahamTested, 2025.
+// https://creativecommons.org/licenses/by-nc-sa/4.0/
 //
 
 
 // ============================================================
 //  DIY Ratiometric Alkalinity Trend Monitor  —  v2.2
-//  Telegraham Tested
+//  TelegrahamTested
 // ============================================================
 
 #define SIMULATION_MODE true
